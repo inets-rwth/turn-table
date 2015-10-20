@@ -18,7 +18,7 @@ class control:
 
     def open(self):
         self.serial_port.open()
-	self.run_input_thread = True
+        self.run_input_thread = True
         self.input_thread = threading.Thread(target=self.monitor_input)
         self.input_thread.start()
 
@@ -34,9 +34,12 @@ class control:
             print 'thread exited'
 
     def move_to(self, pos_deg):
-	diff = pos_deg - self.curr_pos
-        self.curr_por = pos_deg
+        diff = pos_deg - self.curr_pos
+        self.curr_pos = pos_deg
         self.operation_in_progress = True
+        if diff == 0:
+            return
+        print "moving: " + str(int(diff))
         self.serial_port.write(str(int(diff))+"\r\n")
         while self.operation_in_progress:
             time.sleep(0.1)
@@ -44,7 +47,7 @@ class control:
     def monitor_input(self):
         curr_line = ''
         while self.run_input_thread and self.serial_port.isOpen():
-            try:    
+            try:
                  curr_byte = self.serial_port.read()
                  if curr_byte != '':
                      if curr_byte != '\n' and curr_byte != '\r':
@@ -55,6 +58,7 @@ class control:
                              self.operation_in_progress = False
                          curr_line = ""
             except:
+                self.operation_in_progress = False
                 break
 
         print 'exiting input thread'
@@ -66,5 +70,4 @@ if __name__ == "__main__":
     con.open()
     con.move_to(int(pos))
     con.close()
-        
 
