@@ -38,6 +38,8 @@ class control:
         self.curr_por = pos_deg
         self.operation_in_progress = True
         self.serial_port.write(str(int(diff))+"\r\n")
+        while self.operation_in_progress:
+            time.sleep(0.1)
 
     def monitor_input(self):
         curr_line = ''
