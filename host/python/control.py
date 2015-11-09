@@ -8,7 +8,7 @@ class control:
         self.curr_pos = 0
         self.com_port = com_port_name
         self.serial_port = serial.Serial()
-        self.serial_port.baudrate = 19200
+        self.serial_port.baudrate = 9600
         self.serial_port.port = self.com_port
         self.serial_port.bytesize = serial.EIGHTBITS
         self.serial_port.parity = serial.PARITY_NONE
@@ -34,15 +34,21 @@ class control:
             print 'thread exited'
 
     def move_to(self, pos_deg):
-        diff = pos_deg - self.curr_pos
-        self.curr_pos = pos_deg
-        self.operation_in_progress = True
-        if diff == 0:
-            return
-        print "moving: " + str(int(diff))
-        self.serial_port.write(str(int(diff))+"\r\n")
-        while self.operation_in_progress:
-            time.sleep(0.1)
+        if pos_deg == 32767:
+            self.operation_in_progress = True
+            self.serial_port.write(str(int(32767))+"\r\n")
+            while self.operation_in_progress:
+                time.sleep(0.1)
+        else:
+            diff = pos_deg - self.curr_pos
+            self.curr_pos = pos_deg
+            self.operation_in_progress = True
+            if diff == 0:
+                return
+            print "Moving " + str(int(diff)) + " Steps"
+            self.serial_port.write(str(int(diff))+"\r\n")
+            while self.operation_in_progress:
+                time.sleep(0.1)
 
     def monitor_input(self):
         curr_line = ''
@@ -54,7 +60,9 @@ class control:
                          curr_line += str(curr_byte)
                      if curr_byte == '\r':
                          print curr_line
-                         if curr_line == 'done':
+                         if curr_line == "Rotation done":
+                             self.operation_in_progress = False
+                         if curr_line == "Requested other turntable to rotate":
                              self.operation_in_progress = False
                          curr_line = ""
             except:
