@@ -1,17 +1,21 @@
-// pin functions on Arduino
+//http://www.embedded.com/design/mcus-processors-and-socs/4006438/Generate-stepper-motor-speed-profiles-in-real-time
+
+// pin functions  on Arduino
 #define stp 5
 #define dir 4
 #define MS1 11
 #define MS2 10
 #define MS3 8
 #define EN  12
-#define LED 13
+#define OTT1 2
+#define OTT2 7
 
 // global variables
-int angle = 5;
 int steps;
 int x;
 int y;
+int val;
+double delvar;
 
 void setup() {
   pinMode(stp, OUTPUT);
@@ -20,16 +24,16 @@ void setup() {
   pinMode(MS2, OUTPUT);
   pinMode(MS3, OUTPUT);
   pinMode(EN, OUTPUT);
-  pinMode(LED, OUTPUT);
+  pinMode(OTT1, INPUT_PULLUP); //From other Turntable
+  pinMode(OTT2, OUTPUT); //To other Turntable
 
   digitalWrite(EN, HIGH);
+  digitalWrite(OTT2, HIGH);
   
   // 16 microsteps
   digitalWrite(MS1, HIGH);
   digitalWrite(MS2, HIGH);
-  digitalWrite(MS3, HIGH); 
-  
-  analogWrite(LED, 50);
+  digitalWrite(MS3, HIGH);
   
   Serial.begin(9600); // Open Serial connection
   Serial.println("Ready");
@@ -41,39 +45,52 @@ void setup() {
 
 void loop() {
   if (Serial.available()) {
-    angle = Serial.parseInt();
+    steps = Serial.parseInt();
     
-    if (angle < 0) {
+    if (steps < 0) {
       digitalWrite(dir, LOW);
-      angle = abs(angle);
+      steps = abs(steps);
     }
     else digitalWrite(dir, HIGH);
 	
-	// transmission ration 5; 200 steps, 16 microsteps;
-    steps = angle * 44.44; 
-    
-	// allow only half step positions
-	// steps = steps - (steps % 8);
+	// transmission ratio 1:5 or 1:10, 200 steps, 16 microsteps;
 	
-    if (steps != 0) {
+    if (steps != 0 && steps != 32767) {
       Step();	  
-      Serial.println("done"); 
+      Serial.println("Rotation done");
+    }
+    if (steps == 32767) {
+      digitalWrite(OTT2, LOW);
+      delay(100);
+      digitalWrite(OTT2, HIGH);
+      Serial.println("Requested other turntable to rotate");
     }
   }
-  else delay(10);
+  else {
+    val = digitalRead(OTT1);
+    if (val == 0) {
+      steps = 100;
+      Step();
+      Serial.println("Rotation done");
+      steps = 0;
+      delay(100);
+  }
+  delay(10);
+  }
 }
 
-
 void Step(){  
-  for (x = 1; x < steps; x++)  {
+  delvar = 6000;
+  for (x = 1; x <= steps; x++)  {
     digitalWrite(stp, HIGH); //Trigger one step forward
-    delay(1.5);
+    delayMicroseconds(delvar);
     digitalWrite(stp, LOW);
-    if ((x < 480 && x <= steps/2) || (x > steps - 480 && x > steps/2)) delay(0.5);
-    if ((x < 240 && x <= steps/2) || (x > steps - 240 && x > steps/2)) delay(0.5);
-    if ((x < 160 && x <= steps/2) || (x > steps - 160 && x > steps/2)) delay(0.5);
-    if ((x < 80 && x <= steps/2) || (x > steps - 80 && x > steps/2)) delay(1);
-    if (x % 160 == 100) analogWrite(LED, 255);
-    if (x % 160 == 0) analogWrite(LED, 50);
+    delayMicroseconds(delvar);
+    if (delvar > 150 && x < steps/2) {
+      delvar -= 2*delvar/(4*x+1);
+    }
+    if ((steps > 1752 && x > steps - 876) || (steps <= 1752 && x >= steps/2)) {
+      delvar -= 2*delvar/(4*(x-steps-1)+1);
+    }
   } 
 }
