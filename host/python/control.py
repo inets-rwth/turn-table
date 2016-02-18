@@ -58,6 +58,10 @@ class control:
         while self.operation_in_progress:
             time.sleep(0.1)
 
+    def trigger_remote_table(self):
+        self.serial_port.write("trig\r\n")
+        self.operation_in_progress = True
+
     def monitor_input(self):
         curr_line = ''
         while self.run_input_thread and self.serial_port.isOpen():
