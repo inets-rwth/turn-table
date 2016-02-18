@@ -18,6 +18,17 @@ class control:
 
     def open(self):
         self.serial_port.open()
+        self.serial_port.write("get spr\r\n")
+        response = ""
+        while True:
+            curr = self.serial_port.read()
+            if curr != '\r':
+                if curr == '\n':
+                    break;
+                else:
+                    response += curr
+
+        self.spr = int(response)
         self.run_input_thread = True
         self.input_thread = threading.Thread(target=self.monitor_input)
         self.input_thread.start()
@@ -36,11 +47,14 @@ class control:
     def move_to(self, pos_deg):
         diff = pos_deg - self.curr_pos
         self.curr_pos = pos_deg
-        self.operation_in_progress = True
         if diff == 0:
             return
-        print "moving: " + str(int(diff))
-        self.serial_port.write(str(int(diff))+"\r\n")
+        diff_steps = (self.spr/360.0)*diff
+        if int(diff_steps) - diff_steps != 0:
+            print "WARNING: I can't move by this amount accurately"
+        print "moving: " + str(float(diff)) + ' deg => ' + str(diff_steps) + ' steps'
+        self.serial_port.write("move " + str(int(diff_steps))+"\r\n")
+        self.operation_in_progress = True
         while self.operation_in_progress:
             time.sleep(0.1)
 
@@ -54,7 +68,7 @@ class control:
                          curr_line += str(curr_byte)
                      if curr_byte == '\r':
                          print curr_line
-                         if curr_line == 'done':
+                         if curr_line == 'OK':
                              self.operation_in_progress = False
                          curr_line = ""
             except:
@@ -68,6 +82,6 @@ if __name__ == "__main__":
 
     con = control("/dev/ttyACM0")
     con.open()
-    con.move_to(int(pos))
+    con.move_to(float(pos))
     con.close()
 
