@@ -7,14 +7,14 @@
 #define EN  12
 #define OTT1 2
 #define OTT2 7
-
+#define TRANSMISSION 5
 // transmission ratio 1:5 or 1:10, 200 steps, 16 microsteps;
 //per trigger event table should rotate by 1.125 deg
 // global variables
 int x;
 int y;
 int val;
-int transmission = 5;
+int transmission = TRANSMISSION;
 int spr = 200 * 16 * transmission;
 int trig_step_width = 10 * transmission;
 double delvar;
@@ -52,7 +52,7 @@ void loop() {
   if (Serial.available()) {
 
     byte num = Serial.readBytesUntil('\n', serialBuffer, 128);
-    
+
     if (num == 0) {
       return;
     }
