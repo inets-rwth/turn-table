@@ -50,9 +50,10 @@ class control:
         if diff == 0:
             return
         diff_steps = (self.spr/360.0)*diff
+        print "moving: " + str(float(diff)) + ' deg => ' + str(diff_steps) + ' steps'
         if int(diff_steps) - diff_steps != 0:
             print "WARNING: I can't move by this amount accurately"
-        print "moving: " + str(float(diff)) + ' deg => ' + str(diff_steps) + ' steps'
+            print "WARNING: moving " + str(int(diff_steps)) + " steps instead"
         self.serial_port.write("move " + str(int(diff_steps))+"\r\n")
         self.operation_in_progress = True
         while self.operation_in_progress:
