@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 // pin functions  on Arduino
 #define stp 5
 #define dir 4
@@ -8,6 +9,7 @@
 #define OTT1 2
 #define OTT2 7
 #define TRANSMISSION 5
+#define EEPROM_ADDR_TRANS 0
 // transmission ratio 1:5 or 1:10, 200 steps, 16 microsteps;
 //per trigger event table should rotate by 1.125 deg
 // global variables
@@ -21,32 +23,46 @@ double delvar;
 char serialBuffer[128];
 
 void setup() {
-  pinMode(stp, OUTPUT);
-  pinMode(dir, OUTPUT);
-  pinMode(MS1, OUTPUT);
-  pinMode(MS2, OUTPUT);
-  pinMode(MS3, OUTPUT);
-  pinMode(EN, OUTPUT);
-  pinMode(OTT1, INPUT_PULLUP); //From other Turntable
-  pinMode(OTT2, OUTPUT); //To other Turntable
+    pinMode(stp, OUTPUT);
+    pinMode(dir, OUTPUT);
+    pinMode(MS1, OUTPUT);
+    pinMode(MS2, OUTPUT);
+    pinMode(MS3, OUTPUT);
+    pinMode(EN, OUTPUT);
+    pinMode(OTT1, INPUT_PULLUP); //From other Turntable
+    pinMode(OTT2, OUTPUT); //To other Turntable
 
-  digitalWrite(EN, HIGH);
-  digitalWrite(OTT2, HIGH);
+    digitalWrite(EN, HIGH);
+    digitalWrite(OTT2, HIGH);
 
-  // 16 microsteps
-  digitalWrite(MS1, HIGH);
-  digitalWrite(MS2, HIGH);
-  digitalWrite(MS3, HIGH);
+    // 16 microsteps
+    digitalWrite(MS1, HIGH);
+    digitalWrite(MS2, HIGH);
+    digitalWrite(MS3, HIGH);
 
-  Serial.begin(9600); // Open Serial connection
-  Serial.println("Ready");
+    Serial.begin(9600); // Open Serial connection
+    Serial.println("Ready");
 
-  Serial.println();
+    // Pull enable pin low to set FETs active and allow motor control
+    digitalWrite(EN, LOW);
 
-  // Pull enable pin low to set FETs active and allow motor control
-  digitalWrite(EN, LOW);
+    int trans_tmp = EEPROM.read(EEPROM_ADDR_TRANS);
+    if(trans_tmp != 0xFF) {
+        transmission = trans_tmp;
+        println("Transmission ratio loaded from EEPROM");
+        spr = 200 * 16 * transmission;
+        trig_step_width = 10 * transmission;
+    } else {
+        println("No transmission ratio stored in EEPROM");
+    }
+
+    println("spr");
+    println(spr);
+    println("transmission");
+    println(transmission);
+    println("trig step width");
+    println(trig_step_width);
 }
-
 
 void loop() {
   if (Serial.available()) {
@@ -78,6 +94,9 @@ void loop() {
       if (strcmp(tok2, "spr") == 0) {
         Serial.println(spr);
       }
+      if (strcmp(tok2, "trig_width") == 0) {
+        Serial.println(trig_step_width);
+      }
     }
 
     if (strcmp(tok, "set") == 0) {
@@ -85,15 +104,22 @@ void loop() {
       if(tok2 == 0) {
         return;
       }
-      if (strcmp(tok2, "transmission") == 0) {
+      if (strcmp(tok2, "trans") == 0) {
         char* tok3 = strtok(0, " \r");
         if(tok3 == 0) {
           return;
         }
         char* next;
         transmission = strtol(tok3, &next, 10);
+        EEPROM.write(EEPROM_ADDR_TRANS, transmission);
         spr = 200 * 16 * transmission;
         trig_step_width = 10 * transmission;
+        println("spr");
+        println(spr);
+        println("transmission");
+        println(transmission);
+        println("trig step width");
+        println(trig_step_width);
         Serial.println("OK");
       }
     }
