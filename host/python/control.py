@@ -18,6 +18,12 @@ class control:
 
     def open(self):
         self.serial_port.open()
+        self.load_settings()
+        self.run_input_thread = True
+        self.input_thread = threading.Thread(target=self.monitor_input)
+        self.input_thread.start()
+
+    def load_settings(self):
         self.serial_port.write("get spr\r\n")
         response = ""
         while True:
@@ -29,9 +35,6 @@ class control:
                     response += curr
 
         self.spr = int(response)
-        self.run_input_thread = True
-        self.input_thread = threading.Thread(target=self.monitor_input)
-        self.input_thread.start()
 
     def close(self):
         while self.operation_in_progress:
@@ -51,7 +54,7 @@ class control:
             return
         diff_steps = (self.spr/360.0)*diff
         print "moving: " + str(float(diff)) + ' deg => ' + str(diff_steps) + ' steps'
-        if int(diff_steps) - diff_steps != 0:
+        if abs((int(diff_steps) - diff_steps)) > 0.000001:
             print "WARNING: I can't move by this amount accurately"
             print "WARNING: moving " + str(int(diff_steps)) + " steps instead"
         self.serial_port.write("move " + str(int(diff_steps))+"\r\n")
@@ -61,6 +64,10 @@ class control:
 
     def trigger_remote_table(self):
         self.serial_port.write("trig\r\n")
+        self.operation_in_progress = True
+
+    def set_trans_ratio(self, trans):
+        self.serial_port.write("set trans " + str(trans) + "\r\n")
         self.operation_in_progress = True
 
     def monitor_input(self):
