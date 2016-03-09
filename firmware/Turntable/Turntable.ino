@@ -49,19 +49,9 @@ void setup() {
     int trans_tmp = EEPROM.read(EEPROM_ADDR_TRANS);
     if(trans_tmp != 0xFF) {
         transmission = trans_tmp;
-        println("Transmission ratio loaded from EEPROM");
         spr = 200 * 16 * transmission;
         trig_step_width = 10 * transmission;
-    } else {
-        println("No transmission ratio stored in EEPROM");
     }
-
-    println("spr");
-    println(spr);
-    println("transmission");
-    println(transmission);
-    println("trig step width");
-    println(trig_step_width);
 }
 
 void loop() {
@@ -81,6 +71,7 @@ void loop() {
     if (strcmp(tok, "help") == 0) {
       Serial.println("get trig_width : get steps per trigger input");
       Serial.println("get spr : get steps per revolution");
+      Serial.println("get trans : get transmission ratio");
       Serial.println("set trans x: set transmission ratio of table");
       Serial.println("move x: move x steps");
       Serial.println("trig : trigger remote table");
@@ -96,6 +87,9 @@ void loop() {
       }
       if (strcmp(tok2, "trig_width") == 0) {
         Serial.println(trig_step_width);
+      }
+      if (strcmp(tok2, "trans") == 0) {
+        Serial.println(transmission);
       }
     }
 
@@ -114,12 +108,6 @@ void loop() {
         EEPROM.write(EEPROM_ADDR_TRANS, transmission);
         spr = 200 * 16 * transmission;
         trig_step_width = 10 * transmission;
-        println("spr");
-        println(spr);
-        println("transmission");
-        println(transmission);
-        println("trig step width");
-        println(trig_step_width);
         Serial.println("OK");
       }
     }
