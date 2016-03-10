@@ -41,7 +41,6 @@ void setup() {
     digitalWrite(MS3, HIGH);
 
     Serial.begin(9600); // Open Serial connection
-    Serial.println("Ready");
 
     // Pull enable pin low to set FETs active and allow motor control
     digitalWrite(EN, LOW);
