@@ -15,26 +15,22 @@ class control:
         self.serial_port.stopbits = serial.STOPBITS_ONE
         self.serial_port.timeout = 0
         self.operation_in_progress = False
+        self.curr_ans = ""
 
     def open(self):
         self.serial_port.open()
-        self.load_settings()
         self.run_input_thread = True
         self.input_thread = threading.Thread(target=self.monitor_input)
         self.input_thread.start()
+        self.load_settings()
 
     def load_settings(self):
+        self.operation_in_progress = True
         self.serial_port.write("get spr\r\n")
-        response = ""
-        while True:
-            curr = self.serial_port.read()
-            if curr != '\r':
-                if curr == '\n':
-                    break;
-                else:
-                    response += curr
-
-        self.spr = int(response)
+        while(self.operation_in_progress):
+            time.sleep(0.1)
+        self.spr = int(self.curr_ans)
+        print("settings loaded. spr = " + str(self.spr))
 
     def close(self):
         while self.operation_in_progress:
@@ -57,36 +53,39 @@ class control:
         if abs((int(diff_steps) - diff_steps)) > 0.000001:
             print "WARNING: I can't move by this amount accurately"
             print "WARNING: moving " + str(int(diff_steps)) + " steps instead"
-        self.serial_port.write("move " + str(int(diff_steps))+"\r\n")
         self.operation_in_progress = True
+        self.serial_port.write("move " + str(int(diff_steps))+"\r\n")
         while self.operation_in_progress:
             time.sleep(0.1)
 
     def trigger_remote_table(self):
+        self.operation_in_progress = True
         self.serial_port.write("trig\r\n")
-        self.operation_in_progress = True
+        while self.operation_in_progress:
+            time.sleep(0.1)
 
-    def set_trans_ratio(self, trans):
-        self.serial_port.write("set trans " + str(trans) + "\r\n")
+    def set_transmission_ratio(self, trans):
         self.operation_in_progress = True
+        self.serial_port.write("set trans " + str(trans) + "\r\n")
+        while self.operation_in_progress:
+            time.sleep(0.1)
 
     def monitor_input(self):
         curr_line = ''
         while self.run_input_thread and self.serial_port.isOpen():
             try:
                  curr_byte = self.serial_port.read()
-                 if curr_byte != '':
+                 if curr_byte != '' and self.operation_in_progress:
                      if curr_byte != '\n' and curr_byte != '\r':
                          curr_line += str(curr_byte)
                      if curr_byte == '\r':
-                         print curr_line
-                         if curr_line == 'OK':
-                             self.operation_in_progress = False
+                         self.curr_ans = curr_line
                          curr_line = ""
+                         self.operation_in_progress = False
             except:
+                curr_line = ""
                 self.operation_in_progress = False
                 break
-
         print 'exiting input thread'
 
 if __name__ == "__main__":
