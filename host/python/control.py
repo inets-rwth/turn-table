@@ -69,6 +69,7 @@ class control:
         self.serial_port.write("set trans " + str(trans) + "\r\n")
         while self.operation_in_progress:
             time.sleep(0.1)
+        self.load_settings()
 
     def monitor_input(self):
         curr_line = ''
