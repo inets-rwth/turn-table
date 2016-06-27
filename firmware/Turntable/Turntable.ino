@@ -1,8 +1,12 @@
 /*
-motors with 200 step resolution
-8 or 16 microsteps
-transmission ratio [1:5, 1:10, 1:12.6]
-1.125 deg per trigger event
+Startup sequence:
+- Push the button to wake the vertical motor and start the accelerometer
+- Push the button again to tilt the box to equilibrium 
+- Turn until the marker aligns with the distance sensor to wake the horizontal motor and let it turn to 0°
+
+pushing the button during movement stops the motors
+
+every turntable has individual data stored: transmissionratios, microsteps and offsets
 */
 
 #include <EEPROM.h> // read/write specific turntable data
@@ -32,10 +36,10 @@ transmission ratio [1:5, 1:10, 1:12.6]
 #define EEPROM_ADDR_OFFSET_v 6
 
 // global variables
-bool active_h, active_v, is_3D = false;
+bool active_h, active_v, is_2D = false;
 bool button_pushed = false;
 int x, y, val = 0;
-double delvar;
+float delvar;
 char serialBuffer[128];
 LSM303 accelerometer;
 
@@ -44,8 +48,10 @@ float transmission_h, transmission_v;
 signed int offset_h, offset_v;  // marker/accelerometer offset
 float spd_h, spd_v;  // steps-per-degree
 int trig_step_width_h, trig_step_width_v; // triggering from other turntable
-float angle_h_is, angle_v_is;
-float angle_h_target, angle_v_target;
+float angle_h_is = 0;
+float angle_v_is = 0;
+float angle_h_target = 0;
+float angle_v_target = 0;
 
 unsigned long last_interrupt_time = 0;
 
@@ -75,7 +81,7 @@ void setup() {
   }
   trans_tmp = EEPROM.read(EEPROM_ADDR_TRANS_v);
   if (trans_tmp != 0xFF) {
-    is_3D = true;
+    is_2D = true;
     transmission_v = (float)trans_tmp / 10;
   }
   int msteps_tmp = EEPROM.read(EEPROM_ADDR_mSTEPS_h);
@@ -88,25 +94,31 @@ void setup() {
   }
   int offset_tmp = EEPROM.read(EEPROM_ADDR_OFFSET_h);
   if (offset_tmp != 0xFF) {
-    offset_h = offset_tmp - 128;
+    offset_h = offset_tmp;
   }
   offset_tmp = EEPROM.read(EEPROM_ADDR_OFFSET_v);
   if (offset_tmp != 0xFF) {
     offset_v = offset_tmp - 128;
   }  
-  calculate();
+  spd_h = transmission_h * msteps_h / 1.8;
+  trig_step_width_h = 10 * transmission_h;
+  spd_v = msteps_v * transmission_v / 1.8;
+  trig_step_width_v = 10 * transmission_v;
 }
 
 void loop() {
   if (button_pushed) {
-    calibrate();
     button_pushed = false;
+    calibrate();
   }
   //int zahl = analogRead(SENSOR);
   //Serial.println(zahl);
   if (!active_h && analogRead(SENSOR) < THRESHOLD_SENSOR) {
     active_h = true;
     digitalWrite(nSLP_h, HIGH); // set controller active
+    digitalWrite(DIR_h, HIGH); // move CW
+    delay(100);
+    Step((offset_h * spd_h), STP_h); // go to 0 degrees
   }
 
   if (Serial.available()) {
@@ -129,14 +141,6 @@ void button() {
   }
 }
 
-void calculate()
-{
-  spd_h = transmission_h * msteps_h / 1.8;
-  trig_step_width_h = 10 * transmission_h;
-  spd_v = msteps_v * transmission_v / 1.8;
-  trig_step_width_v = 10 * transmission_v;
-}
-
 // return to vertical equilibrium
 void calibrate()
 {
@@ -148,17 +152,16 @@ void calibrate()
   }
   else accelerometer.read();
   int steps = (asin((float)accelerometer.a.x / 16384) * 180 / 3.141 + offset_v) * spd_v;
+
+  //if (abs(steps) > 1500) steps = 0; //
   
-  //Serial.println(steps);
-  //if (abs(steps) > 1500) steps = 0;
   if (steps < 0) {
     digitalWrite(DIR_v, LOW);
     steps = abs(steps);
+    Step(steps, STP_v);
   }
   else {
     digitalWrite(DIR_v, HIGH);
-  }
-  if (steps != 0) {
     Step(steps, STP_v);
   }
 }
@@ -181,7 +184,7 @@ void parse() {
     Serial.println("set msteps x: set microSteps of motorcontroller");
     Serial.println("move x: move x degrees");
     Serial.println("trig : trigger remote table");
-    if (is_3D) {
+    if (is_2D) {
       Serial.println("-------------------------");
       Serial.println("use suffix '_h' for horizontal and '_v' for vertical control");
       Serial.println("eg: 'move_v x' or 'set msteps_h x'");
@@ -191,6 +194,10 @@ void parse() {
     active_h = active_v = false;
     digitalWrite(nSLP_h, LOW);
     digitalWrite(nSLP_v, LOW);
+  }
+  if (strcmp(tok, "status") == 0) {
+    Serial.println(angle_h_is);
+    Serial.println(angle_v_is);
   }
   if (strcmp(tok, "get") == 0) {
     char* tok2 = strtok(0, " \r");
@@ -275,8 +282,8 @@ void parse() {
         return;
       }
       char* next;
-      offset_v = strtol(tok3, &next, 10) ;
-      EEPROM.update(EEPROM_ADDR_OFFSET_h, offset_h + 128);
+      offset_h = strtol(tok3, &next, 10) ;
+      EEPROM.update(EEPROM_ADDR_OFFSET_h, offset_h);
     }
     if (strcmp(tok2, "offset_v") == 0) {
       char* tok3 = strtok(0, " \r");
@@ -287,50 +294,73 @@ void parse() {
       offset_v = strtol(tok3, &next, 10) ;
       EEPROM.update(EEPROM_ADDR_OFFSET_v, offset_v + 128);
     }
-    calculate();
     Serial.println("OK");
   }
 
-  if (strcmp(tok, "move") == 0 || strcmp(tok, "move_h") == 0) {
+  if (strcmp(tok, "move") == 0 || strcmp(tok, "move_h") == 0) {     
     char* tok2 = strtok(0, " \r");
     if (tok2 == 0) {
       return;
     }
     char* next;
-    int angle = strtol((const char*)tok2, &next, 10);
-    if (angle < 0) {
-      angle = abs(angle);
-      if (is_3D) digitalWrite(DIR_h, HIGH); // horizontal motors are flipped
-      else digitalWrite(DIR_h, LOW);      
+    int steps = 0;
+    double angle = strtod((const char*)tok2, &next);
+    angle_h_target += angle;
+    Serial.println(angle_h_target);
+    if (is_2D && (angle_h_target > 360 || angle_h_target < 0)){  // limited between 0 and 360°
+      angle_h_target -= angle;
+      Serial.println("Not OK");
     }
-    else {
-      if (is_3D) digitalWrite(DIR_h, LOW);
-      else digitalWrite(DIR_h, HIGH);
-    }
-    if (angle != 0) {
-      int steps = angle * spd_h;
+    else{  
+      //Serial.println(angle);
+      angle = angle_h_target - angle_h_is;
+      //Serial.println(angle);
+      if (angle < 0) {
+        angle = abs(angle);
+        if (is_2D) digitalWrite(DIR_h, HIGH); // horizontal motors are flipped ??
+        else digitalWrite(DIR_h, LOW); 
+        steps = angle * spd_h;
+        angle_h_is -= Step(steps, STP_h) / spd_h;
+      }       
+      else {
+        if (is_2D) digitalWrite(DIR_h, LOW);
+        else digitalWrite(DIR_h, HIGH);
+        steps = angle * spd_h;
+        angle_h_is += Step(steps, STP_h) / spd_h;
+      }
       Serial.println(steps);
-      Step(steps, STP_h);
     }
   }
 
-  if (strcmp(tok, "move_v") == 0) {
+  if (strcmp(tok, "move_v") == 0) { 
     char* tok2 = strtok(0, " \r");
     if (tok2 == 0) {
       return;
     }
     char* next;
-    int angle = strtol((const char*)tok2, &next, 10);
-    if (angle < 0) {
-      digitalWrite(DIR_v, LOW);
-      angle = abs(angle);
+    int steps;
+    double angle = strtod((const char*)tok2, &next);
+    angle_v_target += angle;
+    if (angle_v_target > 46 || angle_v_target < -46){  // limited between -46° and +46°
+      angle_v_target -= angle;
+      Serial.println("Not OK");
     }
-    else {
-      digitalWrite(DIR_v, HIGH);
-    }
-    if (angle != 0) {
-      int steps = angle * spd_v;
-      Step(steps, STP_v);
+    else{
+      //Serial.println(angle);
+      angle = angle_v_target - angle_v_is;
+      //Serial.println(angle);
+      if (angle < 0) {
+        digitalWrite(DIR_v, LOW);
+        angle = abs(angle);
+        steps = angle * spd_v;
+        angle_v_is -= Step(steps, STP_v) / spd_v;
+      }
+      else {
+        digitalWrite(DIR_v, HIGH);
+        steps = angle * spd_v;
+        angle_v_is -= Step(steps, STP_v) / spd_v;
+      }
+      Serial.println(steps);
     }
   }
   if (strcmp(tok, "trig") == 0) {
@@ -341,7 +371,7 @@ void parse() {
   }
 }
 
-void Step(int steps, int pin)
+int Step(int steps, int pin)
 {
   delvar = 6000;
   for (x = 1; x <= steps; x++)  {
@@ -360,8 +390,6 @@ void Step(int steps, int pin)
       delvar -= 2 * delvar / (4 * (x - steps - 1) + 1);
     }  
   }
-  
-  // return x
-  // add x to real angle aber steps.... mit spd
-  Serial.println("OK");
+  if (steps == x) Serial.println("OK");
+  return x;
 }
