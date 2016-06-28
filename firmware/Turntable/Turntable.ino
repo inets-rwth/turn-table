@@ -1,17 +1,16 @@
 /*
+Pushing the button can be used to interrupt any motor movement!
+
 Startup sequence:
-- Push the button to wake the vertical motor and start the accelerometer
-- Push the button again to tilt the box to equilibrium 
-- Turn until the marker aligns with the distance sensor to wake the horizontal motor and let it turn to 0°
-
-pushing the button during movement stops the motors
-
-every turntable has individual data stored: transmissionratios, microsteps and offsets
+- Push the button to enable the vertical motor
+- Push the button again to balance the box
+- Turn until the marker aligns with the distance sensor to enable the horizontal motor
 */
 
 #include <EEPROM.h> // read/write specific turntable data
 #include <Wire.h>   // I2C communication
 #include <LSM303.h> // accelerometer library
+https://github.com/pololu/lsm303-arduino
 
 // I/O pins
 #define OTT1 0 
@@ -109,14 +108,12 @@ void setup() {
 void loop() {
   if (button_pushed) {
     button_pushed = false;
-    calibrate();
+    balance();
   }
-  //int zahl = analogRead(SENSOR);
-  //Serial.println(zahl);
   if (!active_h && analogRead(SENSOR) < THRESHOLD_SENSOR) {
     active_h = true;
     digitalWrite(nSLP_h, HIGH); // set controller active
-    digitalWrite(DIR_h, HIGH); // move CW
+    digitalWrite(DIR_h, HIGH); // move clockwise
     delay(100);
     Step((offset_h * spd_h), STP_h); // go to 0 degrees
   }
@@ -133,6 +130,7 @@ void loop() {
   }
 }
 
+// set global variable
 void button() {
   unsigned long interrupt_time = millis();
   if (interrupt_time - last_interrupt_time > 1000){
@@ -141,8 +139,8 @@ void button() {
   }
 }
 
-// return to vertical equilibrium
-void calibrate()
+// return to vertical equilibrium (offset_v)
+void balance()
 {
   if (!active_v){
     active_v = true;
@@ -153,7 +151,7 @@ void calibrate()
   else accelerometer.read();
   int steps = (asin((float)accelerometer.a.x / 16384) * 180 / 3.141 + offset_v) * spd_v;
 
-  //if (abs(steps) > 1500) steps = 0; //
+  //if (abs(steps) > 1500) steps = 0; 
   
   if (steps < 0) {
     digitalWrite(DIR_v, LOW);
@@ -166,6 +164,7 @@ void calibrate()
   }
 }
 
+// execute command from user
 void parse() {
   byte num = Serial.readBytesUntil('\n', serialBuffer, 128);
   if (num == 0) {
@@ -296,7 +295,8 @@ void parse() {
     }
     Serial.println("OK");
   }
-
+  
+// limited between 0 and 360°
   if (strcmp(tok, "move") == 0 || strcmp(tok, "move_h") == 0) {     
     char* tok2 = strtok(0, " \r");
     if (tok2 == 0) {
@@ -307,14 +307,12 @@ void parse() {
     double angle = strtod((const char*)tok2, &next);
     angle_h_target += angle;
     Serial.println(angle_h_target);
-    if (is_2D && (angle_h_target > 360 || angle_h_target < 0)){  // limited between 0 and 360°
+    if (is_2D && (angle_h_target > 360 || angle_h_target < 0)){  
       angle_h_target -= angle;
       Serial.println("Not OK");
     }
     else{  
-      //Serial.println(angle);
       angle = angle_h_target - angle_h_is;
-      //Serial.println(angle);
       if (angle < 0) {
         angle = abs(angle);
         if (is_2D) digitalWrite(DIR_h, HIGH); // horizontal motors are flipped ??
@@ -331,7 +329,8 @@ void parse() {
       Serial.println(steps);
     }
   }
-
+  
+// limited between -46° and +46°
   if (strcmp(tok, "move_v") == 0) { 
     char* tok2 = strtok(0, " \r");
     if (tok2 == 0) {
@@ -341,14 +340,12 @@ void parse() {
     int steps;
     double angle = strtod((const char*)tok2, &next);
     angle_v_target += angle;
-    if (angle_v_target > 46 || angle_v_target < -46){  // limited between -46° and +46°
+    if (angle_v_target > 46 || angle_v_target < -46){  
       angle_v_target -= angle;
       Serial.println("Not OK");
     }
     else{
-      //Serial.println(angle);
       angle = angle_v_target - angle_v_is;
-      //Serial.println(angle);
       if (angle < 0) {
         digitalWrite(DIR_v, LOW);
         angle = abs(angle);
@@ -371,6 +368,7 @@ void parse() {
   }
 }
 
+// rotate motor
 int Step(int steps, int pin)
 {
   delvar = 6000;
@@ -379,7 +377,7 @@ int Step(int steps, int pin)
       button_pushed = false;
       break;
     }
-    digitalWrite(pin, HIGH); //Trigger one step forward
+    digitalWrite(pin, HIGH); 
     delayMicroseconds(delvar);
     digitalWrite(pin, LOW);
     delayMicroseconds(delvar);

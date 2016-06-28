@@ -8,7 +8,7 @@ class control:
         self.curr_pos = 0
         self.com_port = com_port_name
         self.serial_port = serial.Serial()
-        self.serial_port.baudrate = 19200
+		self.serial_port.baudrate = 19200
         self.serial_port.port = self.com_port
         self.serial_port.bytesize = serial.EIGHTBITS
         self.serial_port.parity = serial.PARITY_NONE
@@ -24,13 +24,13 @@ class control:
         self.input_thread.start()
         self.load_settings()
 
-    def load_settings(self):
-        self.operation_in_progress = True
-        self.serial_port.write("get spr\r\n")
-        while(self.operation_in_progress):
-            time.sleep(0.1)
-        self.spr = int(self.curr_ans)
-        print("settings loaded. spr = " + str(self.spr))
+//  def load_settings(self):
+//      self.operation_in_progress = True
+//      self.serial_port.write("get spr\r\n")
+//      while(self.operation_in_progress):
+//          time.sleep(0.1)
+//      self.spr = int(self.curr_ans)
+//      print("settings loaded. spr = " + str(self.spr))
 
     def close(self):
         while self.operation_in_progress:
@@ -48,13 +48,13 @@ class control:
         self.curr_pos = pos_deg
         if diff == 0:
             return
-        diff_steps = (self.spr/360.0)*diff
-        print "moving: " + str(float(diff)) + ' deg => ' + str(diff_steps) + ' steps'
-        if abs((int(diff_steps) - diff_steps)) > 0.000001:
+//		diff_steps = (self.spr/360.0)*diff
+        print "moving: " + str(float(diff)) + ' deg // => ' + str(diff_steps) + ' steps'
+        if abs((int(diff) - diff)) > 0.000001:
             print "WARNING: I can't move by this amount accurately"
-            print "WARNING: moving " + str(int(diff_steps)) + " steps instead"
+            print "WARNING: moving " + str(int(diff)) + " steps instead"
         self.operation_in_progress = True
-        self.serial_port.write("move " + str(int(diff_steps))+"\r\n")
+        self.serial_port.write("move " + str(int(diff))+"\r\n")
         while self.operation_in_progress:
             time.sleep(0.1)
 
