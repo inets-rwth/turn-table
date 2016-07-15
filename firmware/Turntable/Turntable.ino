@@ -1,59 +1,64 @@
 #include <EEPROM.h>
 // pin functions  on Arduino
-#define stp 5
-#define dir 4
-#define MS1 11
-#define MS2 10
-#define MS3 8
-#define EN  12
+
+
 #define OTT1 2
+
+#define PIN_EN  4
+#define PIN_STEP 5
+#define PIN_DIR 6
+
 #define OTT2 7
-#define TRANSMISSION 5
+
+#define MICRO1_PIN 8
+#define MICRO2_PIN 9
+#define MICRO3_PIN 10
+
+#define TRANSMISSION 10
 #define EEPROM_ADDR_TRANS 0
+#define MICRO 8
+
 // transmission ratio 1:5 or 1:10, 200 steps, 16 microsteps;
 //per trigger event table should rotate by 1.125 deg
 // global variables
-int x;
-int y;
-int val;
+
+
 int transmission = TRANSMISSION;
-int spr = 200 * 16 * transmission;
+int spr = 200 * MICRO * TRANSMISSION;
 int trig_step_width = 10 * transmission;
 double delvar;
 char serialBuffer[128];
 
 void setup() {
-    pinMode(stp, OUTPUT);
-    pinMode(dir, OUTPUT);
-    pinMode(MS1, OUTPUT);
-    pinMode(MS2, OUTPUT);
-    pinMode(MS3, OUTPUT);
-    pinMode(EN, OUTPUT);
+    pinMode(PIN_STEP, OUTPUT);
+    pinMode(PIN_DIR, OUTPUT);
+    pinMode(PIN_EN, OUTPUT);
+    pinMode(MICRO1_PIN, OUTPUT);
+    pinMode(MICRO2_PIN, OUTPUT);
+    pinMode(MICRO3_PIN, OUTPUT);
+     
     pinMode(OTT1, INPUT_PULLUP); //From other Turntable
     pinMode(OTT2, OUTPUT); //To other Turntable
 
-    digitalWrite(EN, HIGH);
+    digitalWrite(PIN_EN, LOW);
     digitalWrite(OTT2, HIGH);
 
-    // 16 microsteps
-    digitalWrite(MS1, HIGH);
-    digitalWrite(MS2, HIGH);
-    digitalWrite(MS3, HIGH);
+    digitalWrite(MICRO1_PIN, HIGH);
+    digitalWrite(MICRO2_PIN, HIGH);
+    digitalWrite(MICRO3_PIN, LOW);
 
     Serial.begin(9600); // Open Serial connection
-
-    // Pull enable pin low to set FETs active and allow motor control
-    digitalWrite(EN, LOW);
 
     int trans_tmp = EEPROM.read(EEPROM_ADDR_TRANS);
     if(trans_tmp != 0xFF) {
         transmission = trans_tmp;
-        spr = 200 * 16 * transmission;
+        spr = 200 * MICRO * transmission;
         trig_step_width = 10 * transmission;
     }
 }
 
 void loop() {
+  int val = 0;
   if (Serial.available()) {
 
     byte num = Serial.readBytesUntil('\n', serialBuffer, 128);
@@ -105,7 +110,7 @@ void loop() {
         char* next;
         transmission = strtol(tok3, &next, 10);
         EEPROM.write(EEPROM_ADDR_TRANS, transmission);
-        spr = 200 * 16 * transmission;
+        spr = 200 * MICRO * transmission;
         trig_step_width = 10 * transmission;
         Serial.println("OK");
       }
@@ -119,11 +124,11 @@ void loop() {
       char* next;
       int steps = strtol((const char*)tok2, &next, 10);
       if (steps < 0) {
-        digitalWrite(dir, LOW);
+        digitalWrite(PIN_DIR, LOW);
         steps = abs(steps);
       }
       else {
-        digitalWrite(dir, HIGH);
+        digitalWrite(PIN_DIR, HIGH);
       }
       if (steps != 0) {
         Step(steps);
@@ -150,17 +155,26 @@ void loop() {
 
 void Step(int steps)
 {
-  delvar = 6000;
-  for (x = 1; x <= steps; x++)  {
-    digitalWrite(stp, HIGH); //Trigger one step forward
-    delayMicroseconds(delvar);
-    digitalWrite(stp, LOW);
-    delayMicroseconds(delvar);
-    if (delvar > 150 && x < steps / 2) {
-      delvar -= 2 * delvar / (4 * x + 1);
+  int x;
+  int dt = 1000;
+  bool accel = true;
+  bool decel = false;
+  
+  for (x = 0; x < steps; x++)  {
+    digitalWrite(PIN_STEP, HIGH); //Trigger one step forward
+    delayMicroseconds(10);
+    digitalWrite(PIN_STEP, LOW);
+    delayMicroseconds(dt);
+    
+    if(x < (spr/10) && !(x > (steps - (spr/10)))) {
+      if(dt > 150) {
+        dt--;
+      }
     }
-    if ((steps > 1752 && x > steps - 876) || (steps <= 1752 && x >= steps / 2)) {
-      delvar -= 2 * delvar / (4 * (x - steps - 1) + 1);
+    if(x > (steps - (spr/10))) {
+      if(dt < 1000) {
+        dt++; 
+      }
     }
   }
 }

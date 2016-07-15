@@ -35,13 +35,13 @@ class control:
     def close(self):
         while self.operation_in_progress:
             time.sleep(1)
-        print 'closing connection'
+        print('closing connection')
         self.serial_port.close()
         self.run_input_thread = False
         if self.input_thread.isAlive():
-            print 'joining thread'
+            print('joining thread')
             self.input_thread.join()
-            print 'thread exited'
+            print('thread exited')
 
     def move_to(self, pos_deg):
         diff = pos_deg - self.curr_pos
@@ -49,10 +49,10 @@ class control:
         if diff == 0:
             return
         diff_steps = (self.spr/360.0)*diff
-        print "moving: " + str(float(diff)) + ' deg => ' + str(diff_steps) + ' steps'
+        print("moving: " + str(float(diff)) + ' deg => ' + str(diff_steps) + ' steps')
         if abs((int(diff_steps) - diff_steps)) > 0.000001:
-            print "WARNING: I can't move by this amount accurately"
-            print "WARNING: moving " + str(int(diff_steps)) + " steps instead"
+            print("WARNING: I can't move by this amount accurately")
+            print("WARNING: moving " + str(int(diff_steps)) + " steps instead")
         self.operation_in_progress = True
         self.serial_port.write("move " + str(int(diff_steps))+"\r\n")
         while self.operation_in_progress:
@@ -87,7 +87,7 @@ class control:
                 curr_line = ""
                 self.operation_in_progress = False
                 break
-        print 'exiting input thread'
+        print('exiting input thread')
 
 if __name__ == "__main__":
     pos = sys.argv[1]
