@@ -19,7 +19,7 @@
 #define MICRO 8
 
 // transmission ratio 1:5 or 1:10, 200 steps, 16 microsteps;
-//per trigger event table should rotate by 1.125 deg
+// per trigger event table should rotate by 1.125 deg
 // global variables
 
 
@@ -148,6 +148,7 @@ void loop() {
     val = digitalRead(OTT1);
     if (val == 0) {
       Step(trig_step_width);
+      Serial.println(trig_step_width);
       delay(2); //make sure to not catch the same trigger again
     }
   }
@@ -156,22 +157,22 @@ void loop() {
 void Step(int steps)
 {
   int x;
-  int dt = 1000;
+  int dt = 3000;
   bool accel = true;
   bool decel = false;
   
   for (x = 0; x < steps; x++)  {
     digitalWrite(PIN_STEP, HIGH); //Trigger one step forward
-    delayMicroseconds(10);
+    delayMicroseconds(100);
     digitalWrite(PIN_STEP, LOW);
     delayMicroseconds(dt);
     
-    if(x < (spr/10) && !(x > (steps - (spr/10)))) {
+    if(x < (spr/5) && !(x > (steps - (spr/5)))) {
       if(dt > 150) {
         dt--;
       }
     }
-    if(x > (steps - (spr/10))) {
+    if(x > (steps - (spr/5))) {
       if(dt < 1000) {
         dt++; 
       }
