@@ -21,6 +21,7 @@ class control:
         self.serial_port.open()
         self.run_input_thread = True
         self.input_thread = threading.Thread(target=self.monitor_input)
+        self.input_thread.daemon = True
         self.input_thread.start()
         self.load_settings()
 
@@ -54,6 +55,7 @@ class control:
             print "WARNING: I can't move by this amount accurately"
             print "WARNING: moving " + str(int(diff_steps)) + " steps instead"
         self.operation_in_progress = True
+        print("sending: " + "move " + str(int(diff_steps)))
         self.serial_port.write("move " + str(int(diff_steps))+"\r\n")
         while self.operation_in_progress:
             time.sleep(0.1)
@@ -90,9 +92,11 @@ class control:
         print 'exiting input thread'
 
 if __name__ == "__main__":
-    pos = sys.argv[1]
+    pos = sys.argv[2]
+    port = sys.argv[1]
 
-    con = control("/dev/ttyACM0")
+    con = control(port)
+
     con.open()
     con.move_to(float(pos))
     con.close()
