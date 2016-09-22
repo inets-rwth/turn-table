@@ -36,7 +36,7 @@ void setup() {
     pinMode(MICRO1_PIN, OUTPUT);
     pinMode(MICRO2_PIN, OUTPUT);
     pinMode(MICRO3_PIN, OUTPUT);
-     
+
     pinMode(OTT1, INPUT_PULLUP); //From other Turntable
     pinMode(OTT2, OUTPUT); //To other Turntable
 
@@ -157,24 +157,26 @@ void loop() {
 void Step(int steps)
 {
   int x;
-  int dt = 3000;
+  int dt = 2000;
   bool accel = true;
-  bool decel = false;
-  
+  int ramp_len = 100;
+
   for (x = 0; x < steps; x++)  {
     digitalWrite(PIN_STEP, HIGH); //Trigger one step forward
     delayMicroseconds(100);
     digitalWrite(PIN_STEP, LOW);
     delayMicroseconds(dt);
-    
-    if(x < (spr/5) && !(x > (steps - (spr/5)))) {
+
+    if(x < ramp_len && ((steps - x) > ramp_len)) {
       if(dt > 150) {
-        dt--;
+        dt-=5;
       }
+    } else {
+      accel = false;
     }
-    if(x > (steps - (spr/5))) {
-      if(dt < 1000) {
-        dt++; 
+    if(!accel && ((steps - x) <= ramp_len)) {
+      if(dt < 2000) {
+        dt+=5;
       }
     }
   }
