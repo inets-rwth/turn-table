@@ -157,26 +157,25 @@ void loop() {
 void Step(int steps)
 {
   int x;
-  int dt = 2000;
+  int dt = 1200;
   bool accel = true;
-  int ramp_len = 100;
+  int ramp_len = 500;
 
   for (x = 0; x < steps; x++)  {
     digitalWrite(PIN_STEP, HIGH); //Trigger one step forward
     delayMicroseconds(100);
     digitalWrite(PIN_STEP, LOW);
-    delayMicroseconds(dt);
-
+    delayMicroseconds(dt+10);
     if(x < ramp_len && ((steps - x) > ramp_len)) {
-      if(dt > 150) {
-        dt-=5;
+      if(dt > 200) {
+        dt-=2;
       }
     } else {
       accel = false;
     }
     if(!accel && ((steps - x) <= ramp_len)) {
-      if(dt < 2000) {
-        dt+=5;
+      if(dt < 1200) {
+        dt+=2;
       }
     }
   }
